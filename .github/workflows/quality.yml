@@ -24,11 +24,5 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --disable-pip-version-check -r requirements.txt
 
-      - name: Django system check
-        run: python manage.py check
-
-      - name: Run tests
-        run: python manage.py test
-
-      - name: Verify migrations are unchanged
-        run: python manage.py makemigrations --check --dry-run
+      - name: Run deterministic quality gate
+        run: bash scripts/quality.sh
