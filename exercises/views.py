@@ -148,21 +148,21 @@ def get_person_plannings(request, person_id, all_plannings):
 @api_view(['GET'])
 def get_exercise_with_muscular_group(request, pk):
     if request.method == 'GET':
-        raw = f"select A.id AS exercise_id, A.name AS exercise_name, a.url as exercise_url, C.id as musuclar_group_id, C.name AS musuclar_group_name, C.url as musuclar_group_url from exercises_exercise a left join exercises_musculargroup_exercises b on a.id = b.exercise_id join exercises_musculargroup c on c.id = b.musculargroup_id where A.id = {pk}"
-
-        with connection.cursor() as cursor:
-            cursor.execute(raw)
-            res = dict_fetchall(cursor)
-        ids = np.unique(np.array([el['exercise_id'] for el in res]))
+        exercises = Exercise.objects.filter(pk=pk).prefetch_related('musculargroup_set')
         final_data = []
-        for id in ids:
-            new_data = []
-            for el in res:
-                if el['exercise_id'] == id:
-                    new_data.append(el)
-            final_data.append({"id": new_data[0]['exercise_id'], "name": new_data[0]['exercise_name'],
-                               "url": new_data[0]['exercise_url'], "muscular_groups": [{'id': el['musuclar_group_id'], "name": el['musuclar_group_name'], 'url': el['musuclar_group_url']} for el in new_data]})
-
+        for exercise in exercises:
+            muscular_groups = exercise.musculargroup_set.all()
+            if not muscular_groups:
+                continue
+            final_data.append({
+                "id": exercise.id,
+                "name": exercise.name,
+                "url": exercise.url,
+                "muscular_groups": [
+                    {"id": mg.id, "name": mg.name, "url": mg.url}
+                    for mg in muscular_groups
+                ],
+            })
         return JsonResponse(data=final_data, safe=False)
 
 
