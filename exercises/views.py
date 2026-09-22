@@ -84,38 +84,29 @@ def get_muscular_groups_by_exercise(request, exercise_id):
 
 @api_view(['GET'])
 def get_person_plannings_2(request, person_id, all_plannings):
-    person_planning_raw = f"select * from exercises_personplanning where person_id = {person_id} {f'and state = {all_plannings}'  if not all_plannings else ''}"
+    person_planning_qs = PersonPlanning.objects.filter(person_id=person_id)
+    if not all_plannings:
+        person_planning_qs = person_planning_qs.filter(state=all_plannings)
+    planning_ids = list(person_planning_qs.values_list(
+        'Planning_id', flat=True).distinct())
 
-    with connection.cursor() as cursor:
-        cursor.execute(person_planning_raw)
-        res = dict_fetchall(cursor)
-    ids = np.unique(np.array([el['Planning_id'] for el in res]))
+    routines = Routine.objects.filter(id__in=planning_ids).prefetch_related(
+        'routineexercise_set__exercise')
+    routines_by_id = {routine.id: routine for routine in routines}
+
     final_res = []
-    for id in ids:
-        routine_exercise_raw = f'select A.id, A.series, A.day,B.id AS routine_exercise_id, B.repetitions, B.unity, B.weight, C.name AS exercise from exercises_routine A left join exercises_routineexercise B ON A.id = B.routine_id LEFT JOIN exercises_exercise C ON C.id = B.exercise_id WHERE A.id = {id}'
-        with connection.cursor() as cursor:
-            cursor.execute(routine_exercise_raw)
-            second_res = dict_fetchall(cursor)
-        print(f'\n\n{second_res}\n\n')
-        partial_res = {'id': second_res[0]['id'], 'series': second_res[0]
-                       ['series'], 'day': second_res[0]['day'], 'routines': []}
-        for el in second_res:
-            partial_res['routines'].append({'id': el['routine_exercise_id'], 'repetitions': el['repetitions'],
-                                           'unity': el['unity'], 'weight': el['weight'], 'exercise': el['exercise']})
+    for planning_id in planning_ids:
+        routine = routines_by_id.get(planning_id)
+        if routine is None:
+            continue
+        partial_res = {'id': routine.id, 'series': routine.series,
+                       'day': routine.day, 'routines': []}
+        for routine_exercise in routine.routineexercise_set.all():
+            partial_res['routines'].append({
+                'id': routine_exercise.id, 'repetitions': routine_exercise.repetitions,
+                'unity': routine_exercise.unity, 'weight': routine_exercise.weight,
+                'exercise': routine_exercise.exercise.name})
         final_res.append(partial_res)
-        # res = Planning.objects.filter(pk=id)
-        # res = PlanningSerializer(res, many=True)
-        # partial_res = []
-        # for i, el in enumerate(res.data, start=0):
-        #     if el["routines"]:
-        #         routine_id = el["routines"][i]["id"]
-        #         query_1 = RoutineExercise.objects.filter(routine=routine_id)
-        #         query_2 = RoutineExerciseSerializer(query_1, many=True)
-        #         new_el = {**el, "routines": query_2.data}
-        #     else:
-        #         new_el = {**el, "routines": []}
-        #     partial_res.append(new_el)
-        # final_res.append(partial_res[0])
     return JsonResponse(data=final_res, safe=False)
 
 
