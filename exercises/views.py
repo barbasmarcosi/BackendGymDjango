@@ -148,11 +148,19 @@ def get_person_plannings(request, person_id, all_plannings):
 @api_view(['GET'])
 def get_exercise_with_muscular_group(request, pk):
     if request.method == 'GET':
-        raw = f"select A.id AS exercise_id, A.name AS exercise_name, a.url as exercise_url, C.id as musuclar_group_id, C.name AS musuclar_group_name, C.url as musuclar_group_url from exercises_exercise a left join exercises_musculargroup_exercises b on a.id = b.exercise_id join exercises_musculargroup c on c.id = b.musculargroup_id where A.id = {pk}"
-
-        with connection.cursor() as cursor:
-            cursor.execute(raw)
-            res = dict_fetchall(cursor)
+        exercise = Exercise.objects.filter(pk=pk).prefetch_related(
+            'musculargroup_set').first()
+        res = []
+        if exercise is not None:
+            for group in exercise.musculargroup_set.all():
+                res.append({
+                    'exercise_id': exercise.id,
+                    'exercise_name': exercise.name,
+                    'exercise_url': exercise.url,
+                    'musuclar_group_id': group.id,
+                    'musuclar_group_name': group.name,
+                    'musuclar_group_url': group.url,
+                })
         ids = np.unique(np.array([el['exercise_id'] for el in res]))
         final_data = []
         for id in ids:
